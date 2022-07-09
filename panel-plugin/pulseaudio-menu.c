@@ -137,13 +137,11 @@ pulseaudio_menu_output_range_scroll (GtkWidget        *widget,
   GdkEventScroll *scroll_event;
 
   g_return_if_fail (IS_PULSEAUDIO_MENU (menu));
-  volume =  pulseaudio_volume_get_volume (menu->volume);
   volume_step = pulseaudio_config_get_volume_step (menu->config) / 100.0;
 
   scroll_event = (GdkEventScroll*)event;
 
-  new_volume = volume + (1.0 - 2.0 * scroll_event->direction) * volume_step;
-  pulseaudio_volume_set_volume (menu->volume, new_volume);
+  pulseaudio_volume_increase_volume (menu->volume, scroll_event->direction == 1 ? -volume_step : volume_step);
 }
 
 

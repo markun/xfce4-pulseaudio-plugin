@@ -231,18 +231,9 @@ static gboolean
 pulseaudio_button_scroll_event (GtkWidget *widget, GdkEventScroll *event)
 {
   PulseaudioButton *button      = PULSEAUDIO_BUTTON (widget);
-  gdouble           volume      = pulseaudio_volume_get_volume (button->volume);
   gdouble           volume_step = pulseaudio_config_get_volume_step (button->config) / 100.0;
-  gdouble           new_volume;
 
-  if (event->direction == 1)  // decrease volume
-    new_volume = volume - volume_step;
-  else if (event->direction == 0)  // increase volume
-    new_volume = MIN (volume + volume_step, MAX (volume, 1.0));
-  else
-    new_volume = volume;
-
-  pulseaudio_volume_set_volume (button->volume, new_volume);
+  pulseaudio_volume_increase_volume (button->volume, event->direction == 0 ? volume_step : -volume_step);
 
   return TRUE;
 }

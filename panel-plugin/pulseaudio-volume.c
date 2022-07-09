@@ -30,6 +30,10 @@
 #include <config.h>
 #endif
 
+#ifdef HAVE_MATH_H
+#include <math.h>
+#endif
+
 #include <pulse/pulseaudio.h>
 #include <pulse/glib-mainloop.h>
 
@@ -77,6 +81,8 @@ struct _PulseaudioVolume
 
   gdouble               volume_mic;
   gboolean              muted_mic;
+
+  gdouble               volume_increase;
 
   guint                 reconnect_timer_id;
   guint                 volume_timer_id;
@@ -149,6 +155,7 @@ pulseaudio_volume_init (PulseaudioVolume *volume)
   volume->muted = FALSE;
   volume->volume_mic = 0.0;
   volume->muted_mic = FALSE;
+  volume->volume_increase = 0.0;
   volume->reconnect_timer_id = 0;
   volume->volume_timer_id = 0;
 
@@ -753,10 +760,41 @@ pulseaudio_volume_set_volume_cb0 (gpointer userdata)
 {
   PulseaudioVolume *volume = PULSEAUDIO_VOLUME (userdata);
 
+  gdouble vol_max;
+  gdouble vol_inc_accel;
+  gdouble vol_inc = 0.0;
+
   volume->volume_timer_id = 0;
+
+  if (volume->volume_increase != 0.0)
+  {
+    vol_inc_accel = pow(fabs(volume->volume_increase) * 100.0, 1.4) / 100.0;
+    vol_inc = (volume->volume_increase < 0) ? -vol_inc_accel : vol_inc_accel;
+    volume->volume_increase = 0.0;
+  }
+
+  vol_max = pulseaudio_config_get_volume_max (volume->config) / 100.0;
+  volume->volume = MIN (MAX (volume->volume + vol_inc, 0.0), vol_max);
+
   pa_context_get_server_info (volume->pa_context, pulseaudio_volume_set_volume_cb1, volume);
 
   return FALSE;  // stop the timer
+}
+
+
+
+void
+pulseaudio_volume_increase_volume (PulseaudioVolume *volume,
+                              gdouble           volume_increase)
+{
+  g_return_if_fail (IS_PULSEAUDIO_VOLUME (volume));
+  g_return_if_fail (volume->pa_context != NULL);
+  g_return_if_fail (pa_context_get_state (volume->pa_context) == PA_CONTEXT_READY);
+
+  volume->volume_increase += volume_increase;
+
+  if (volume->volume_timer_id == 0)
+    volume->volume_timer_id = g_timeout_add (100, pulseaudio_volume_set_volume_cb0, volume);
 }
 
 

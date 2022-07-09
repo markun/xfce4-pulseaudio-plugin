@@ -79,6 +79,7 @@ struct _PulseaudioVolume
   gboolean              muted_mic;
 
   guint                 reconnect_timer_id;
+  guint                 volume_timer_id;
 
   /* Device management */
   GHashTable           *sinks;
@@ -149,6 +150,7 @@ pulseaudio_volume_init (PulseaudioVolume *volume)
   volume->volume_mic = 0.0;
   volume->muted_mic = FALSE;
   volume->reconnect_timer_id = 0;
+  volume->volume_timer_id = 0;
 
   volume->default_sink_name = NULL;
   volume->default_source_name = NULL;
@@ -746,6 +748,19 @@ pulseaudio_volume_set_volume_cb1 (pa_context           *context,
 
 
 
+static gboolean
+pulseaudio_volume_set_volume_cb0 (gpointer userdata)
+{
+  PulseaudioVolume *volume = PULSEAUDIO_VOLUME (userdata);
+
+  volume->volume_timer_id = 0;
+  pa_context_get_server_info (volume->pa_context, pulseaudio_volume_set_volume_cb1, volume);
+
+  return FALSE;  // stop the timer
+}
+
+
+
 void
 pulseaudio_volume_set_volume (PulseaudioVolume *volume,
                               gdouble           vol)
@@ -763,7 +778,9 @@ pulseaudio_volume_set_volume (PulseaudioVolume *volume,
   if (volume->volume != vol_trim)
   {
     volume->volume = vol_trim;
-    pa_context_get_server_info (volume->pa_context, pulseaudio_volume_set_volume_cb1, volume);
+
+    if (volume->volume_timer_id == 0)
+      volume->volume_timer_id = g_timeout_add (100, pulseaudio_volume_set_volume_cb0, volume);
   }
 }
 
